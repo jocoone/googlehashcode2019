@@ -1,0 +1,22 @@
+{
+  "name": "google-hashcode2019",
+  "version": "1.0.0",
+  "description": "Google hashcode",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./run.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jocoone/googlehashcode2019.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jocoone/googlehashcode2019/issues"
+  },
+  "homepage": "https://github.com/jocoone/googlehashcode2019#readme",
+  "dependencies": {
+    "yargs": "^13.2.1"
+  }
+}
