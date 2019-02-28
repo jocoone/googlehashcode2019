@@ -5,8 +5,12 @@ const uniq = require('lodash/uniq');
 const min = require('lodash/min');
 const max = require('lodash/max');
 const maxBy = require('lodash/maxBy');
+const minBy = require('lodash/minBy');
 const findIndex = require('lodash/findIndex');
 const pullAt = require('lodash/pullAt');
+const orderBy = require('lodash/orderBy');
+
+let MAX_SCORE = 0;
 
 class Photo {
   constructor(id, orientation, tags) {
@@ -21,19 +25,34 @@ class Photo {
 }
 
 class Slide {
-  constructor(photos, tags) {
+  constructor(id, photos, tags) {
+    this.id = id;
     this.photos = photos;
     this.tags = tags;
+    this.scores = {};
   }
 
   getScoreWithSlide(slide) {
-    const tagsinfo = {
-      common: intersection(this.tags, slide.tags),
-      aNotB: difference(this.tags, slide.tags),
-      bNotA: difference(slide.tags, this.tags)
-    };
+    if (this.scores[slide.id]) {
+      return this.scores[slide.id];
+    }
+    const common = intersection(this.tags, slide.tags);
+    if (common === 0) {
+      this.scores[slide.id] = 0;
+      return 0;
+    }
+    const aNotB = difference(this.tags, slide.tags);
+    if (aNotB === 0) {
+      this.scores[slide.id] = 0;
+      return 0;
+    }
+    const bNotA = difference(slide.tags, this.tags);
+    const tagsinfo = {common, aNotB, bNotA,};
+    const result = min([tagsinfo.common.length, tagsinfo.aNotB.length, tagsinfo.bNotA.length]);
 
-    return min([tagsinfo.common.length, tagsinfo.aNotB.length, tagsinfo.bNotA.length])
+    this.scores[slide.id] = result;
+
+    return result;
   }
 
   toString() {
@@ -45,11 +64,42 @@ const run = (input, outputFile) => {
   console.time('photos');
   const photos = getPhotos(input);
   const slidesToSort = getSlides(photos);
-  const slides = sortSlides(slidesToSort);
-  writeFile(`./output/${outputFile}`, slidesToString(slides));
+  //const x = removeZeros(slidesToSort);
+  const result = [];
+  while (slidesToSort.length > 0) {
+    const l = slidesToSort.splice(0, 80);
+    const slides = sortSlides(l);
+    result.push(...slides);
+    console.log(slidesToSort.length);
+  }
+  writeFile(`./output/${outputFile}`, slidesToString(result));
   console.timeEnd('photos');
   return input;
 };
+
+function sortSlides2(slides) {
+  return orderBy(slides, (slide) => (slide.tags.length), 'desc');
+}
+
+function removeZeros(slides) {
+  const result =[];
+  for (let i = 0; i < slides.length; i++) {
+    const slide1 = slides[i];
+
+    const notZero = slides.some((s) => {
+      return slide1.getScoreWithSlide(s) > 0;
+    });
+
+    if (notZero) {
+      result.push(slide1);
+    } else {
+      console.log('niet toegevoegd');
+    }
+  }
+  console.log('before', slides.length);
+  console.log('after', result.length);
+  return result;
+}
 
 function sortSlides(slides) {
   const result = [slides[0]];
@@ -60,9 +110,6 @@ function sortSlides(slides) {
     result.push(maxSlide);
     const indexToRemove = findIndex(slides, s => s.id === maxSlide.id);
     slides.splice(indexToRemove, 1);
-    if (result.length % 100 === 0) {
-      console.log(result.length);
-    }
   }
   return result;
 }
@@ -80,13 +127,14 @@ function getSlides(photos) {
   const verticals = getVerticals(photos);
 
   const slides = [];
+  let i = 0;
   for (let hor = 0; hor < horizontals.length; hor++) {
-    slides.push(new Slide([horizontals[hor].id], horizontals[hor].tags));
+    slides.push(new Slide(i++, [horizontals[hor].id], horizontals[hor].tags));
   }
   for (let ver = 0; ver < verticals.length; ver+=2) {
     const photo1 = verticals[ver];
     const photo2 = verticals[ver + 1];
-    slides.push(new Slide([photo1.id, photo2.id], uniq([...photo1.tags, ...photo2.tags])));
+    slides.push(new Slide(i++, [photo1.id, photo2.id], uniq([...photo1.tags, ...photo2.tags])));
   }
   return slides;
 }
