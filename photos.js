@@ -2,6 +2,11 @@ const {writeFile} = require('./io');
 const intersection = require('lodash/intersection');
 const difference = require('lodash/difference');
 const uniq = require('lodash/uniq');
+const min = require('lodash/min');
+const max = require('lodash/max');
+const maxBy = require('lodash/maxBy');
+const findIndex = require('lodash/findIndex');
+const pullAt = require('lodash/pullAt');
 
 class Photo {
   constructor(id, orientation, tags) {
@@ -9,16 +14,6 @@ class Photo {
     this.orientation = orientation;
     this.tags = tags;
   };
-
-  getTagsInfo(photo) {
-    return {
-      id1: this.id,
-      id2: photo.id,
-      common: intersection(this.tags, photo.tags),
-      aNotB: difference(this.tags, photo.tags),
-      bNotA: difference(photo.tags, this.tags)
-    };
-  }
 
   toString() {
     return `Photo ${this.id} -> ${this.orientation}, ${this.tags}`;
@@ -31,6 +26,16 @@ class Slide {
     this.tags = tags;
   }
 
+  getScoreWithSlide(slide) {
+    const tagsinfo = {
+      common: intersection(this.tags, slide.tags),
+      aNotB: difference(this.tags, slide.tags),
+      bNotA: difference(slide.tags, this.tags)
+    };
+
+    return min([tagsinfo.common.length, tagsinfo.aNotB.length, tagsinfo.bNotA.length])
+  }
+
   toString() {
     return `${this.photos}: ${this.tags}`;
   }
@@ -39,20 +44,28 @@ class Slide {
 const run = (input, outputFile) => {
   console.time('photos');
   const photos = getPhotos(input);
-  const slides = getSlides(photos);
-
-  /*for (let photo = 0; photo < photos.length; photo++) {
-    const otherPhotos = photos.filter(p => p.id !== photos[photo].id);
-    for (let x = 0; x < otherPhotos.length; x++) {
-      console.log(photos[photo].getTagsInfo(otherPhotos[x]));
-    }
-  }
-
-  console.log(test);*/
+  const slidesToSort = getSlides(photos);
+  const slides = sortSlides(slidesToSort);
   writeFile(`./output/${outputFile}`, slidesToString(slides));
   console.timeEnd('photos');
   return input;
 };
+
+function sortSlides(slides) {
+  const result = [slides[0]];
+  slides.splice(0, 1);
+  while(slides.length !== 0) {
+    const comparingSlide = result[result.length - 1];
+    const maxSlide = maxBy(slides, (slide) => comparingSlide.getScoreWithSlide(slide));
+    result.push(maxSlide);
+    const indexToRemove = findIndex(slides, s => s.id === maxSlide.id);
+    slides.splice(indexToRemove, 1);
+    if (result.length % 100 === 0) {
+      console.log(result.length);
+    }
+  }
+  return result;
+}
 
 function slidesToString(slides) {
   let result = '' + slides.length +'\n';
